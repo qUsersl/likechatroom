@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>局域网聊天室 - 登录</title>
+    <script src="https://res.gemcoder.com/js/reload.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1677ff',
+                        secondary: '#6b7280',
+                        accent: '#36bffa',
+                        success: '#00b42a',
+                        warning: '#ff7d00',
+                        danger: '#f53f3f',
+                        light: '#f2f3f5',
+                        dark: '#1d2129'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'card': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        'card-hover': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                    }
+                }
+            }
+        };
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto { content-visibility: auto; }
+            .text-shadow { text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .transition-custom { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+            .bg-gradient-custom { background: linear-gradient(135deg, #1677ff 0%, #36bff9 100%); }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="bg-white rounded-2xl shadow-card overflow-hidden transition-custom hover:shadow-card-hover">
+            <div class="bg-gradient-custom p-8 text-center">
+                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-comments text-white text-2xl"></i>
+                </div>
+                <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold text-white text-shadow mb-1">局域网聊天室</h1>
+                <p class="text-white/80">连接到本地网络，开始聊天吧</p>
+            </div>
+
+            <div class="p-8">
+                <form id="loginForm" class="space-y-5">
+                    <div class="space-y-2">
+                        <label for="nickname" class="block text-sm font-medium text-gray-700">
+                            <i class="fas fa-user-circle mr-1"></i> 昵称
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                            <input type="text" id="nickname" name="nickname" required class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-custom outline-none" placeholder="请输入您的昵称" autocomplete="off"/>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="password" class="block text-sm font-medium text-gray-700">
+                            <i class="fas fa-lock mr-1"></i> 密码
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <input type="password" id="password" name="password" required class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-custom outline-none" placeholder="请输入密码 (123456)"/>
+                            <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-custom">
+                                <i class="fas fa-eye-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label for="server" class="block text-sm font-medium text-gray-700">
+                            <i class="fas fa-server mr-1"></i> 服务器
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-server text-gray-400"></i>
+                            </div>
+                            <select id="server" name="server" required class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-custom outline-none appearance-none bg-white">
+                                <option value="" disabled selected>选择可用服务器</option>
+                                {% for server in servers %}
+                                <option value="{{ server.address }}">{{ server.name }} ({{ server.address }})</option>
+                                {% endfor %}
+                                <option value="custom">自定义服务器...</option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <i class="fas fa-chevron-down text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="customServerSection" class="hidden space-y-2">
+                        <label for="customServer" class="block text-sm font-medium text-gray-700">
+                            <i class="fas fa-server mr-1"></i> 自定义服务器地址
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-globe text-gray-400"></i>
+                            </div>
+                            <input type="text" id="customServer" name="customServer" class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-custom outline-none" placeholder="例如: 192.168.1.100:8080" autocomplete="off"/>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center">
+                        <input id="rememberPassword" name="rememberPassword" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded transition-custom"/>
+                        <label for="rememberPassword" class="ml-2 block text-sm text-gray-700">记住密码</label>
+                    </div>
+
+                    <button type="submit" id="loginButton" class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-custom flex items-center justify-center space-x-2 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-primary/20">
+                        <span>登录</span>
+                        <i class="fas fa-sign-in-alt"></i>
+                    </button>
+                </form>
+            </div>
+
+            <div class="px-8 pb-8">
+                <div class="text-center text-sm text-gray-500">
+                    <p>还没有账号? <a href="javascript:void(0);" id="registerLink" class="text-primary hover:text-primary/80 font-medium transition-custom">立即注册</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var loginForm = document.getElementById('loginForm');
+            var nicknameInput = document.getElementById('nickname');
+            var passwordInput = document.getElementById('password');
+            var togglePassword = document.getElementById('togglePassword');
+            var serverSelect = document.getElementById('server');
+            var customServerSection = document.getElementById('customServerSection');
+            var customServerInput = document.getElementById('customServer');
+            var rememberPassword = document.getElementById('rememberPassword');
+            var loginButton = document.getElementById('loginButton');
+            var registerLink = document.getElementById('registerLink');
+
+            // Toggle Password
+            togglePassword.addEventListener('click', function () {
+                var type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                togglePassword.querySelector('i').classList.toggle('fa-eye');
+                togglePassword.querySelector('i').classList.toggle('fa-eye-slash');
+            });
+
+            // Server Selection
+            serverSelect.addEventListener('change', function () {
+                if (serverSelect.value === 'custom') {
+                    customServerSection.classList.remove('hidden');
+                    customServerInput.required = true;
+                } else {
+                    customServerSection.classList.add('hidden');
+                    customServerInput.required = false;
+                }
+            });
+
+            // Login Submit
+            loginForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                var serverVal = serverSelect.value === 'custom' ? customServerInput.value.trim() : serverSelect.value;
+                var formData = {
+                    nickname: nicknameInput.value.trim(),
+                    password: passwordInput.value,
+                    server: serverVal,
+                    rememberPassword: rememberPassword.checked
+                };
+
+                if (!formData.nickname) return showNotification('请输入昵称', 'error');
+                if (!formData.password) return showNotification('请输入密码', 'error');
+                if (!formData.server) return showNotification('请选择或输入服务器', 'error');
+
+                loginButton.disabled = true;
+                loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 登录中...';
+
+                fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (formData.rememberPassword) {
+                            localStorage.setItem('chatroom_nickname', formData.nickname);
+                        } else {
+                            localStorage.removeItem('chatroom_nickname');
+                        }
+                        showNotification('登录成功！正在进入聊天室...', 'success');
+                        setTimeout(() => { window.location.href = '/chat'; }, 1000);
+                    } else {
+                        showNotification(data.message, 'error');
+                        loginButton.disabled = false;
+                        loginButton.innerHTML = '<span>登录</span><i class="fas fa-sign-in-alt"></i>';
+                    }
+                })
+                .catch(err => {
+                    showNotification('登录失败，请稍后重试', 'error');
+                    loginButton.disabled = false;
+                    loginButton.innerHTML = '<span>登录</span><i class="fas fa-sign-in-alt"></i>';
+                });
+            });
+
+            registerLink.addEventListener('click', function () {
+                showNotification('注册功能即将上线，敬请期待！', 'info');
+            });
+
+            var savedNickname = localStorage.getItem('chatroom_nickname');
+            if (savedNickname) {
+                nicknameInput.value = savedNickname;
+                rememberPassword.checked = true;
+            }
+
+            function showNotification(message, type = 'info') {
+                var notification = document.createElement('div');
+                var bgColor = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : type === 'warning' ? 'bg-warning' : 'bg-primary';
+                var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+                
+                notification.className = `fixed top-4 right-4 ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg transform transition-all duration-500 translate-x-full z-50 flex items-center`;
+                notification.innerHTML = `<i class="fas ${icon} mr-2"></i><span>${message}</span>`;
+                
+                document.body.appendChild(notification);
+                setTimeout(() => { notification.classList.remove('translate-x-full'); notification.classList.add('translate-x-0'); }, 10);
+                setTimeout(() => {
+                    notification.classList.remove('translate-x-0');
+                    notification.classList.add('translate-x-full');
+                    setTimeout(() => document.body.removeChild(notification), 500);
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

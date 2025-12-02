@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>局域网聊天室</title>
+    <script src="https://res.gemcoder.com/js/reload.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1677ff',
+                        secondary: '#6b7280',
+                        accent: '#36bffa',
+                        success: '#00b42a',
+                        warning: '#ff7d00',
+                        danger: '#f53f3f',
+                        light: '#f2f3f5',
+                        dark: '#1d2129'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .transition-custom { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        }
+        /* Custom scrollbar for message container only */
+        #messageContainer::-webkit-scrollbar {
+            width: 6px;
+        }
+        #messageContainer::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        #messageContainer::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 3px;
+        }
+        #messageContainer::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-100 h-screen flex items-center justify-center overflow-hidden">
+    <div class="w-full h-full max-w-[1440px] bg-white shadow-2xl flex overflow-hidden relative">
+        
+        <!-- Sidebar -->
+        <div class="w-64 bg-white border-r border-gray-200 flex flex-col h-full hidden md:flex">
+            <div class="p-3 border-b border-gray-200">
+                <div class="relative">
+                    <input class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="搜索聊天..." type="text"/>
+                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto" id="userList">
+                <!-- User list will be populated by JS -->
+            </div>
+            <div class="p-3 border-t border-gray-200">
+                <div class="flex items-center">
+                    <img src="/api/searchImage?query={{ nickname }}" class="w-8 h-8 rounded-full"/>
+                    <span class="ml-2 text-sm font-medium truncate">{{ nickname }}</span>
+                    <a href="/" class="ml-auto text-gray-400 hover:text-danger"><i class="fas fa-sign-out-alt"></i></a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="flex-1 flex flex-col bg-gray-50 w-full">
+            <!-- Header -->
+            <div class="bg-white border-b border-gray-200 p-3 flex items-center justify-between">
+                <div class="flex items-center">
+                    <button class="md:hidden mr-2 text-gray-500">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <img alt="Group" class="w-10 h-10 rounded-full object-cover" src="/api/searchImage?query=Group"/>
+                    <div class="ml-3">
+                        <h3 class="font-medium">公共聊天室</h3>
+                        <p class="text-xs text-green-500"><span id="onlineCount">1</span> 人在线</p>
+                    </div>
+                </div>
+                <div class="flex space-x-3 text-gray-500">
+                    <button class="hover:text-primary transition-custom" title="历史记录" onclick="alert('历史记录功能正在建设中...')"><i class="fas fa-history"></i></button>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <div class="flex-1 p-4 overflow-y-auto" id="messageContainer">
+                <!-- Messages will be appended here -->
+            </div>
+
+            <!-- Input Area -->
+            <div class="bg-white border-t border-gray-200 p-3 relative">
+                <div class="flex items-center mb-2 text-gray-500 space-x-2">
+                    <button class="hover:text-primary transition-custom p-1" onclick="insertText('@音乐 ')"><span class="text-xs bg-gray-100 px-2 py-1 rounded">@音乐</span></button>
+                    <button class="hover:text-primary transition-custom p-1" onclick="insertText('@电影 ')"><span class="text-xs bg-gray-100 px-2 py-1 rounded">@电影</span></button>
+                    <button class="hover:text-primary transition-custom p-1" onclick="insertText('@天气 ')"><span class="text-xs bg-gray-100 px-2 py-1 rounded">@天气</span></button>
+                    <button class="hover:text-primary transition-custom p-1" onclick="insertText('@新闻 ')"><span class="text-xs bg-gray-100 px-2 py-1 rounded">@新闻</span></button>
+                    <button class="hover:text-primary transition-custom p-1" onclick="insertText('@成小理 ')"><span class="text-xs bg-gray-100 px-2 py-1 rounded">@成小理</span></button>
+                    
+                    <div class="relative">
+                        <button id="emojiBtn" class="hover:text-primary transition-custom p-1 text-lg">😀</button>
+                        <!-- Emoji Picker -->
+                        <div id="emojiPicker" class="hidden absolute bottom-full right-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-64 h-48 overflow-y-auto z-50">
+                            <div class="grid grid-cols-6 gap-2">
+                                <!-- Emojis will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-end">
+                    <textarea id="messageInput" class="flex-1 border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" placeholder="输入消息..." rows="2"></textarea>
+                    <button id="sendMessageBtn" class="ml-2 bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-primary/90 transition-custom">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var socket = io();
+        var nickname = "{{ nickname }}";
+        var messageContainer = document.getElementById('messageContainer');
+        var messageInput = document.getElementById('messageInput');
+        var sendBtn = document.getElementById('sendMessageBtn');
+        var emojiBtn = document.getElementById('emojiBtn');
+        var emojiPicker = document.getElementById('emojiPicker');
+        var onlineCount = document.getElementById('onlineCount');
+        var userList = document.getElementById('userList');
+        
+        // Common Emoji List
+        var emojis = [
+            '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+            '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+            '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+            '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+            '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+            '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
+            '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
+            '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
+            '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈',
+            '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾',
+            '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿',
+            '😾', '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤏', '✌️', '🤞',
+            '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+            '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
+            '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', '🦶', '👣',
+            '👀', '👁️', '👄', '💋', '👂', '🦻', '👃', '🧠', '🫀', '🫁',
+            '🦷', '🦴', '🗣️', '👤', '👥', '🫂'
+        ];
+
+        // Populate Emoji Picker
+        var emojiGrid = emojiPicker.querySelector('.grid');
+        emojis.forEach(emoji => {
+            var btn = document.createElement('button');
+            btn.className = "text-xl hover:bg-gray-100 p-1 rounded transition-custom";
+            btn.textContent = emoji;
+            btn.onclick = function() {
+                insertText(emoji);
+                emojiPicker.classList.add('hidden');
+            };
+            emojiGrid.appendChild(btn);
+        });
+
+        // Toggle Emoji Picker
+        emojiBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            emojiPicker.classList.toggle('hidden');
+        });
+
+        // Close picker when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+                emojiPicker.classList.add('hidden');
+            }
+        });
+
+        function scrollToBottom() {
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+
+        function appendMessage(data, isSelf) {
+            var div = document.createElement('div');
+            div.className = isSelf ? "flex justify-end mb-4" : "flex justify-start mb-4";
+            
+            var avatarHtml = `<img alt="Avatar" class="w-8 h-8 rounded-full object-cover ${isSelf ? 'ml-2 mt-1 order-2' : 'mr-2 mt-1'}" src="/api/searchImage?query=${data.nickname}"/>`;
+            
+            var contentHtml = `
+                <div class="max-w-[70%] ${isSelf ? 'order-1' : ''}">
+                    <div class="${isSelf ? 'bg-primary text-white rounded-tr-none' : 'bg-white rounded-tl-none'} rounded-lg p-3 shadow-sm">
+                        ${!isSelf ? `<p class="text-xs text-gray-400 mb-1">${data.nickname}</p>` : ''}
+                        <p>${data.msg}</p>
+                    </div>
+                    <span class="text-xs text-gray-400 ${isSelf ? 'mr-2 text-right' : 'ml-2'} block mt-1">${data.time}</span>
+                </div>
+            `;
+            
+            div.innerHTML = isSelf ? contentHtml + avatarHtml : avatarHtml + contentHtml;
+            messageContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        function appendSystemMessage(msg) {
+            var div = document.createElement('div');
+            div.className = "text-center my-4";
+            div.innerHTML = `<span class="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full">${msg}</span>`;
+            messageContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('receive_message', function(data) {
+            appendMessage(data, data.nickname === nickname);
+        });
+
+        socket.on('system_message', function(data) {
+            appendSystemMessage(data.msg);
+        });
+
+        socket.on('update_user_list', function(data) {
+            onlineCount.textContent = data.count;
+            userList.innerHTML = '';
+            data.users.forEach(user => {
+                var userItem = document.createElement('div');
+                userItem.className = 'flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50';
+                userItem.innerHTML = `
+                    <img alt="Avatar" class="w-10 h-10 rounded-full object-cover" src="/api/searchImage?query=${user}"/>
+                    <div class="ml-3 flex-1">
+                        <h4 class="font-medium text-sm text-gray-700">${user}</h4>
+                        <p class="text-xs text-green-500 flex items-center"><span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span>在线</p>
+                    </div>
+                `;
+                userList.appendChild(userItem);
+            });
+        });
+
+        function sendMessage() {
+            var msg = messageInput.value.trim();
+            if (msg) {
+                socket.emit('send_message', {msg: msg});
+                messageInput.value = '';
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        window.insertText = function(text) {
+            messageInput.value += text;
+            messageInput.focus();
+        }
+    </script>
+</body>
+</html>
