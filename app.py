@@ -187,6 +187,26 @@ def handle_message(data):
             else:
                 msg = "请指定城市，例如：@天气 北京"
                 msg_type = 'text'
+        
+        # Check for @新闻 command
+        elif msg.startswith('@新闻'):
+            try:
+                response = requests.get("https://api.yujn.cn/api/new.php", timeout=10)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    if res_data.get('code') == 200:
+                        msg_type = 'news'
+                        msg = res_data['data']
+                    else:
+                        msg = f"获取新闻失败：{res_data.get('msg', '未知错误')}"
+                        msg_type = 'text'
+                else:
+                    msg = "连接新闻服务失败"
+                    msg_type = 'text'
+            except Exception as e:
+                print(f"Error fetching news: {e}")
+                msg = "获取新闻信息失败，请稍后再试"
+                msg_type = 'text'
 
         current_time = datetime.now().strftime('%H:%M')
         emit('receive_message', {
