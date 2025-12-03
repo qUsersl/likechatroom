@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import config
 from datetime import datetime
 from openai import OpenAI
+import requests
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -137,6 +138,56 @@ def handle_message(data):
                 # Construct the parsing URL
                 msg = f"https://jx.2s0.cn/player/?url={url}"
         
+        # Check for @音乐 command
+        elif msg.startswith('@音乐'):
+            try:
+                headers = {'User-Agent': 'xiaoxiaoapi/1.0.0'}
+                response = requests.get("https://v2.xxapi.cn/api/randomkuwo", headers=headers, timeout=5)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    if res_data.get('code') == 200 and res_data.get('data'):
+                        music_data = res_data['data']
+                        msg_type = 'music'
+                        msg = music_data # Send the whole data object as msg
+            except Exception as e:
+                print(f"Error fetching music: {e}")
+                # Fallback to text message if API fails
+                msg = "获取音乐失败，请稍后再试"
+                msg_type = 'text'
+        
+        # Check for @天气 command
+        elif msg.startswith('@天气'):
+            city = msg.replace('@天气', '', 1).strip()
+            if city:
+                try:
+                    # Use the provided API
+                    api_url = f"https://api.yaohud.cn/api/v6/weather?key=07COdsd37gxEvaMVTeH&location={city}"
+                    # The user example uses POST, but usually GET is common for such URLs. 
+                    # However, I will follow the user's reference code: requests.post(url, ...)
+                    # The user's example has data={}, let's try POST. 
+                    # Actually the user example: requests.post(url, data={'key1': 'value1'...}) but url has query params.
+                    # I'll stick to requests.post as per reference.
+                    response = requests.post(api_url)
+                    
+                    if response.status_code == 200:
+                        res_data = response.json()
+                        if res_data.get('code') == 200:
+                            msg_type = 'weather'
+                            msg = res_data['data']
+                        else:
+                            msg = f"查询天气失败：{res_data.get('msg', '未知错误')}"
+                            msg_type = 'text'
+                    else:
+                        msg = "连接天气服务失败"
+                        msg_type = 'text'
+                except Exception as e:
+                    print(f"Error fetching weather: {e}")
+                    msg = "获取天气信息失败，请稍后再试"
+                    msg_type = 'text'
+            else:
+                msg = "请指定城市，例如：@天气 北京"
+                msg_type = 'text'
+
         current_time = datetime.now().strftime('%H:%M')
         emit('receive_message', {
             'nickname': session['nickname'],
