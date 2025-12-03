@@ -135,6 +135,7 @@
         var emojiPicker = document.getElementById('emojiPicker');
         var onlineCount = document.getElementById('onlineCount');
         var userList = document.getElementById('userList');
+        var expectingAICount = 0;
         
         // Common Emoji List
         var emojis = [
@@ -193,11 +194,18 @@
             
             var avatarHtml = `<img alt="Avatar" class="w-8 h-8 rounded-full object-cover ${isSelf ? 'ml-2 mt-1 order-2' : 'mr-2 mt-1'}" src="/api/searchImage?query=${data.nickname}"/>`;
             
+            var messageContent = '';
+            if (data.type === 'video') {
+                messageContent = `<iframe src="${data.msg}" class="w-[400px] h-[400px] border-0 rounded-lg bg-black" allowfullscreen></iframe>`;
+            } else {
+                messageContent = `<p>${data.msg}</p>`;
+            }
+
             var contentHtml = `
                 <div class="max-w-[70%] ${isSelf ? 'order-1' : ''}">
-                    <div class="${isSelf ? 'bg-primary text-white rounded-tr-none' : 'bg-white rounded-tl-none'} rounded-lg p-3 shadow-sm">
+                    <div class="${isSelf ? 'bg-primary text-white rounded-tr-none' : 'bg-white rounded-tl-none'} rounded-lg p-3 shadow-sm overflow-hidden">
                         ${!isSelf ? `<p class="text-xs text-gray-400 mb-1">${data.nickname}</p>` : ''}
-                        <p>${data.msg}</p>
+                        ${messageContent}
                     </div>
                     <span class="text-xs text-gray-400 ${isSelf ? 'mr-2 text-right' : 'ml-2'} block mt-1">${data.time}</span>
                 </div>
@@ -222,6 +230,15 @@
 
         socket.on('receive_message', function(data) {
             appendMessage(data, data.nickname === nickname);
+
+            // Trigger AI response if this is a confirmation of our @成小理 message
+            if (expectingAICount > 0 && data.nickname === nickname && data.msg.startsWith('@成小理')) {
+                var prompt = data.msg.replace('@成小理', '').trim();
+                if (prompt) {
+                    expectingAICount--;
+                    triggerAIResponse(prompt);
+                }
+            }
         });
 
         socket.on('system_message', function(data) {
@@ -245,10 +262,80 @@
             });
         });
 
+        function appendAIMessage() {
+            var div = document.createElement('div');
+            div.className = "flex justify-start mb-4";
+            
+            var avatarHtml = `<img alt="Avatar" class="w-8 h-8 rounded-full object-cover mr-2 mt-1" src="/api/searchImage?query=成小理"/>`;
+            
+            var contentHtml = `
+                <div class="max-w-[70%]">
+                    <div class="bg-white rounded-lg rounded-tl-none p-3 shadow-sm">
+                        <p class="text-xs text-gray-400 mb-1">成小理 (AI)</p>
+                        <p class="ai-content typing-indicator">...</p>
+                    </div>
+                    <span class="text-xs text-gray-400 ml-2 block mt-1">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+            `;
+            
+            div.innerHTML = avatarHtml + contentHtml;
+            messageContainer.appendChild(div);
+            scrollToBottom();
+            
+            // Return the content element so we can update it
+            return div.querySelector('.ai-content');
+        }
+
+        function triggerAIResponse(prompt) {
+             var aiContentEl = appendAIMessage();
+             aiContentEl.classList.remove('typing-indicator');
+             aiContentEl.textContent = ''; // Clear "..."
+             
+             // Start SSE
+             var eventSource = new EventSource('/api/ai_chat?prompt=' + encodeURIComponent(prompt));
+             
+             eventSource.onmessage = function(e) {
+                 if (e.data === '[DONE]') {
+                     eventSource.close();
+                     return;
+                 }
+                 
+                 try {
+                     var data = JSON.parse(e.data);
+                     if (data.content) {
+                         aiContentEl.textContent += data.content;
+                         scrollToBottom();
+                     } else if (data.error) {
+                         aiContentEl.textContent += "\n[Error: " + data.error + "]";
+                         eventSource.close();
+                     }
+                 } catch (err) {
+                     console.error('Error parsing SSE data', err);
+                 }
+             };
+             
+             eventSource.onerror = function(e) {
+                 console.error('SSE Error', e);
+                 eventSource.close();
+                 // If empty, maybe show error
+                 if (aiContentEl.textContent === '') {
+                     aiContentEl.textContent = "连接AI服务失败，请稍后再试。";
+                 }
+             };
+        }
+
         function sendMessage() {
             var msg = messageInput.value.trim();
             if (msg) {
                 socket.emit('send_message', {msg: msg});
+                
+                // Check if message starts with @成小理
+                if (msg.startsWith('@成小理')) {
+                    var prompt = msg.replace('@成小理', '').trim();
+                    if (prompt) {
+                        expectingAICount++;
+                    }
+                }
                 messageInput.value = '';
             }
         }
